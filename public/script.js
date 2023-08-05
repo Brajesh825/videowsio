@@ -27,30 +27,29 @@ joinForm.addEventListener('submit', event => {
       addVideoStream(myVideo, stream);
 
       socket.on('user-connected', userId => {
-        if (userId) {
-          connectToNewUser(userId, stream);
-        }
+        if (userId !== USER_ID) connectToNewUser(userId, stream);
       });
 
-      socket.on('existing-users', userIds => {
-        if (userIds) {
-          userIds.forEach(userId => {
-            if (userId !== USER_ID) connectToNewUser(userId, stream);
-          });
-        }
+      socket.on('existing-users', existingUsers => {
+        existingUsers.forEach(user => {
+          if (user.id !== USER_ID) connectToNewUser(user.id, stream);
+        });
       });
 
       socket.on('user-disconnected', userId => {
-        if (peers[userId]) peers[userId].close();
+        if (peers[userId]) {
+          peers[userId].destroy();
+          delete peers[userId];
+        }
       });
+
+      socket.emit('join-room', ROOM_ID, USER_ID);
     } else {
       console.error('Could not get media stream');
     }
   }).catch(err => {
     console.error('Failed to get user media', err);
   });
-
-  socket.emit('join-room', ROOM_ID, USER_ID);
 });
 
 function connectToNewUser(userId, stream) {
@@ -60,37 +59,32 @@ function connectToNewUser(userId, stream) {
     stream: stream
   });
 
-  if (peer) {
-    peer.on('signal', data => {
-      if (data) {
-        socket.emit('join-room', ROOM_ID, userId, data);
-      }
-    });
+  peer.on('signal', data => {
+    socket.emit('join-room', ROOM_ID, userId, data);
+  });
 
-    peer.on('stream', userVideoStream => {
-      if (userVideoStream) {
-        const userVideo = document.createElement('video');
-        addVideoStream(userVideo, userVideoStream);
-      }
-    });
+  peer.on('stream', userVideoStream => {
+    addVideoStream(userId, userVideoStream);
+  });
 
-    peer.on('close', () => {
-      userVideo.remove();
-    });
-
-    peers[userId] = peer;
-  }
+  peers[userId] = peer;
+  broadcastStream(peer, stream); // Broadcast the user's stream to everyone
 }
 
-function addVideoStream(video, stream) {
-  if (video && stream) {
-    video.srcObject = stream;
-    video.addEventListener('loadedmetadata', () => {
-      video.play();
-    });
-    videoGrid.append(video);
-  } else {
-    console.error('Invalid parameters to addVideoStream');
+function addVideoStream(userId, stream) {
+  const video = document.createElement('video');
+  video.srcObject = stream;
+  video.addEventListener('loadedmetadata', () => {
+    video.play();
+  });
+  videoGrid.appendChild(video);
+}
+
+function broadcastStream(peer, stream) {
+  for (const userId in peers) {
+    if (userId !== USER_ID) {
+      peer.signal(peers[userId].initiator ? peers[userId].initiator : peers[userId].receiver);
+    }
   }
 }
 
