@@ -6,12 +6,15 @@ myVideo.muted = true;
 const peers = {};
 let myVideoStream;
 
+let USER_ID, ROOM_ID;
+
+
 const joinForm = document.getElementById('join-form');
 joinForm.addEventListener('submit', event => {
   event.preventDefault();
 
-  const ROOM_ID = document.getElementById('room-id-input').value;
-  const USER_ID = document.getElementById('user-id-input').value;
+  ROOM_ID = document.getElementById('room-id-input').value;
+  USER_ID = document.getElementById('user-id-input').value;
 
   if (!ROOM_ID || !USER_ID) {
     alert('Room ID and User ID are required');
